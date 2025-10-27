@@ -1,6 +1,6 @@
-# rentalist-api
+# easylease-api
 
-> REST API for Rentalist (Express + TypeScript + Mongoose)
+> REST API for EasyLease (Express + TypeScript + Mongoose)
 
 ## Quick start
 

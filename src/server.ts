@@ -7,7 +7,7 @@ async function bootstrap() {
     await connectDB();
     
     app.listen(env.PORT, () => {
-      console.log(`🚀 Rentalist API running on http://localhost:${env.PORT}`);
+      console.log(`🚀 Easylease API running on http://localhost:${env.PORT}`);
       console.log(`📊 Health check: http://localhost:${env.PORT}/api/health`);
       console.log(`🌍 Environment: ${env.NODE_ENV}`);
     });

@@ -7,7 +7,7 @@ export async function connectDB() {
   }
   
   await mongoose.connect(env.MONGODB_URI, {
-    dbName: "rentalist",
+    dbName: "easylease",
   });
   
   console.log("✅ MongoDB connected successfully");
