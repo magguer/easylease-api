@@ -1,9 +1,26 @@
 import express from "express";
 import Listing from "../models/Listing";
 import { z } from "zod";
+import { uploadListingImage, getListingImageUrl, deleteListingImage as deleteFromSupabase, supabase, IMAGES_BUCKET } from "../config/supabase";
+import multer from "multer";
 
 type Request = express.Request;
 type Response = express.Response;
+
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req: any, file: any, cb: any) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 const createListingSchema = z.object({
   title: z.string().min(3),
@@ -165,6 +182,84 @@ export async function deleteListing(req: Request, res: Response) {
 
     res.json({ success: true, message: "Listing deleted" });
   } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// Image upload endpoint
+export async function uploadListingImages(req: Request, res: Response) {
+  try {
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      return res.status(400).json({ success: false, error: "No files uploaded" });
+    }
+
+    const { folder } = req.body;
+    const uploadedUrls: string[] = [];
+
+    for (const file of req.files as Express.Multer.File[]) {
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${file.mimetype.split('/')[1]}`;
+      const fullPath = `${folder}/${fileName}`;
+
+      // Upload directly to Supabase
+      const { data, error } = await supabase.storage
+        .from(IMAGES_BUCKET)
+        .upload(fullPath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from(IMAGES_BUCKET)
+        .getPublicUrl(fullPath);
+
+      uploadedUrls.push(urlData.publicUrl);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        uploadedUrls
+      }
+    });
+  } catch (error: any) {
+    console.error('Upload error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// Delete image endpoint
+export async function deleteListingImage(req: Request, res: Response) {
+  try {
+    const { imageUrl } = req.body;
+
+    if (!imageUrl) {
+      return res.status(400).json({ success: false, error: "Image URL is required" });
+    }
+
+    // Extract the path from the Supabase URL
+    // URL format: https://domain.supabase.co/storage/v1/object/public/bucket/path/file.jpg
+    const urlParts = imageUrl.split('/storage/v1/object/public/');
+    if (urlParts.length !== 2) {
+      return res.status(400).json({ success: false, error: "Invalid image URL format" });
+    }
+
+    const filePath = urlParts[1]; // This will be "bucket/path/file.jpg"
+
+    // Delete from Supabase
+    const { error } = await supabase.storage
+      .from(IMAGES_BUCKET)
+      .remove([filePath]);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: "Image deleted successfully"
+    });
+  } catch (error: any) {
+    console.error('Delete error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 }
