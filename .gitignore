@@ -13,7 +13,5 @@ dist
 .env
 *.log
 .DS_Store
-api/*.js
-api/*.d.ts
-api/*.d.ts.map
-api/index.js
+# Allow committing `api/index.js` serverless entry for Vercel if needed
+# (some builds generate this file in dist/; keep dist/ ignored)
