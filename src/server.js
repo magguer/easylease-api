@@ -65,12 +65,19 @@ app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 
 // Health check endpoint
-app.get("/api/health", (_, res) => {
+app.get("/api/health", async (_, res) => {
+  try {
+    await connectDB();
+  } catch (error) {
+    console.error("Health check - DB connection failed:", error);
+  }
+  
   res.json({
     ok: true,
     status: "healthy",
     timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? "connected" : "disconnected"
+    database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    mongoUri: MONGODB_URI ? "configured" : "missing"
   });
 });
 
