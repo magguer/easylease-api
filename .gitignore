@@ -1,6 +1,5 @@
 node_modules/
 dist/
-build/
 .env
 .env.local
 .DS_Store
@@ -10,4 +9,4 @@ build/
 coverage/
 *.log
 
-# api/index.ts is the Vercel entry point and should be committed
+# build/ is committed for Vercel (only ignore build/Release)

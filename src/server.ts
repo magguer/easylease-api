@@ -3,6 +3,8 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
 import path from "path";
 import { fileURLToPath } from "url";
 import mongoose from "mongoose";
@@ -15,14 +17,20 @@ const __dirname = path.dirname(__filename);
 
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/easylease";
+let dbConnected = false;
 
 async function connectDB() {
+  if (dbConnected || mongoose.connection.readyState === 1) {
+    return;
+  }
+  
   try {
     await mongoose.connect(MONGODB_URI);
-    console.log(`✅ MongoDB connected successfully to ${MONGODB_URI}`);
+    dbConnected = true;
+    console.log(`✅ MongoDB connected successfully`);
   } catch (error) {
     console.error("❌ MongoDB connection error:", error);
-    process.exit(1);
+    throw error;
   }
 }
 
@@ -34,10 +42,27 @@ const options: cors.CorsOptions = {
 const app = express();
 const PORT = config.port;
 
+// Middleware to ensure DB connection (lazy connection for serverless)
+app.use(async (_req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Database connection failed"
+    });
+  }
+});
+
+// Middlewares
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(cors(options));
-app.use(express.json());
+app.use(helmet());
+app.use(express.json({ limit: "1mb" }));
+app.use(morgan("dev"));
 
 // Health check endpoint
 app.get("/api/health", (_, res) => {
@@ -49,21 +74,28 @@ app.get("/api/health", (_, res) => {
   });
 });
 
-// Mount routes - now all routes will be under their respective paths
+// Mount routes
 routes(app);
 
-// Start server with database connection
-async function startServer() {
-  await connectDB();
-  
-  app.listen(PORT, () => {
-    console.info(` >>> EXPRESS_PRIVATE Server listening on http://localhost:${PORT}`);
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: "Route not found",
+    path: req.path,
+  });
+});
+
+// Start server only if not imported as module (i.e., running directly)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.info(` >>> EXPRESS_PRIVATE Server listening on http://localhost:${PORT}`);
+    });
+  }).catch((error) => {
+    console.error("Failed to start server:", error);
+    process.exit(1);
   });
 }
 
-startServer().catch((error) => {
-  console.error("Failed to start server:", error);
-  process.exit(1);
-});
-
-export { express, app };
+export { app };
