@@ -13,7 +13,7 @@ export const IMAGES_BUCKET = 'easylease-storage';
 export const LISTINGS_FOLDER = 'listings';
 
 // Helper function to upload image
-export async function uploadListingImage(file: Buffer, fileName: string, contentType: string) {
+export async function uploadListingImage(file, fileName, contentType) {
   const fullPath = `${LISTINGS_FOLDER}/${fileName}`;
   const { data, error } = await supabase.storage
     .from(IMAGES_BUCKET)
@@ -27,7 +27,7 @@ export async function uploadListingImage(file: Buffer, fileName: string, content
 }
 
 // Helper function to get public URL
-export function getListingImageUrl(fileName: string) {
+export function getListingImageUrl(fileName) {
   const fullPath = `${LISTINGS_FOLDER}/${fileName}`;
   const { data } = supabase.storage
     .from(IMAGES_BUCKET)
@@ -37,7 +37,7 @@ export function getListingImageUrl(fileName: string) {
 }
 
 // Helper function to delete image
-export async function deleteListingImage(fileName: string) {
+export async function deleteListingImage(fileName) {
   const fullPath = `${LISTINGS_FOLDER}/${fileName}`;
   const { error } = await supabase.storage
     .from(IMAGES_BUCKET)

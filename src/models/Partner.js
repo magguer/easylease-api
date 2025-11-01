@@ -1,16 +1,6 @@
 import { Schema, model } from "mongoose";
 
-export interface IPartner {
-  name: string;
-  email: string;
-  phone?: string;
-  company_name?: string;
-  status: "active" | "inactive" | "pending";
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-const PartnerSchema = new Schema<IPartner>(
+const PartnerSchema = new Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, index: true },
@@ -26,4 +16,4 @@ const PartnerSchema = new Schema<IPartner>(
   { timestamps: true }
 );
 
-export default model<IPartner>("Partner", PartnerSchema);
+export default model("Partner", PartnerSchema);

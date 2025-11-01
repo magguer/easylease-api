@@ -1,5 +1,4 @@
 node_modules/
-dist/
 .env
 .env.local
 .DS_Store
@@ -8,5 +7,3 @@ dist/
 .next/
 coverage/
 *.log
-
-# build/ is committed for Vercel (only ignore build/Release)

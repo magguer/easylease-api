@@ -1,17 +1,6 @@
 import { Schema, model } from "mongoose";
 
-export interface ILead {
-  name: string;
-  email: string;
-  phone?: string;
-  message?: string;
-  listing_id?: Schema.Types.ObjectId;
-  status: "new" | "contacted" | "converted" | "discarded";
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-const LeadSchema = new Schema<ILead>(
+const LeadSchema = new Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, index: true },
@@ -32,4 +21,4 @@ const LeadSchema = new Schema<ILead>(
   { timestamps: true }
 );
 
-export default model<ILead>("Lead", LeadSchema);
+export default model("Lead", LeadSchema);

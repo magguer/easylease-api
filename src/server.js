@@ -9,8 +9,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import mongoose from "mongoose";
 
-import config from "./config";
-import routes from "./routes";
+import config from "./config/index.js";
+import routes from "./routes/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,7 +34,7 @@ async function connectDB() {
   }
 }
 
-const options: cors.CorsOptions = {
+const options = {
   origin: config.allowedOriginsCors,
   credentials: true,
 };

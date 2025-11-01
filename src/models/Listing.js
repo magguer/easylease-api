@@ -1,32 +1,6 @@
 import { Schema, model } from "mongoose";
 
-export interface IListing {
-  title: string;
-  slug: string;
-  price_per_week: number;
-  bond: number;
-  bills_included: boolean;
-  address: string;
-  suburb?: string;
-  location?: {
-    type: string;
-    coordinates: [number, number];
-  };
-  room_type: "master" | "double" | "single";
-  available_from?: Date;
-  min_term_weeks: number;
-  preferred_tenants: string[];
-  house_features: string[];
-  rules: string[];
-  images: string[];
-  owner_partner_id?: Schema.Types.ObjectId;
-  status: "draft" | "published" | "reserved" | "rented";
-  locale: "es" | "en";
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-const ListingSchema = new Schema<IListing>(
+const ListingSchema = new Schema(
   {
     title: { type: String, required: true },
     slug: { type: String, unique: true, index: true },
@@ -84,4 +58,4 @@ ListingSchema.index({
   house_features: "text",
 });
 
-export default model<IListing>("Listing", ListingSchema);
+export default model("Listing", ListingSchema);

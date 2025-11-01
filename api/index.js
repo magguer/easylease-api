@@ -1,3 +1,3 @@
-import * as serverModule from "../build/src/server.js";
+import { app } from "../src/server.js";
 
-export default serverModule.app;
+export default app;
