@@ -9,14 +9,17 @@ export const env = {
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 };
 
-if (!env.MONGODB_URI) {
-  throw new Error("Missing MONGODB_URI in .env");
-}
-
-if (!env.SUPABASE_URL) {
-  throw new Error("Missing SUPABASE_URL in .env");
-}
-
-if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in .env");
+// Optional: Warn if missing in production
+if (process.env.NODE_ENV === "production") {
+  if (!env.MONGODB_URI) {
+    console.warn("⚠️  Warning: MONGODB_URI is not set");
+  }
+  
+  if (!env.SUPABASE_URL) {
+    console.warn("⚠️  Warning: SUPABASE_URL is not set");
+  }
+  
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn("⚠️  Warning: SUPABASE_SERVICE_ROLE_KEY is not set");
+  }
 }

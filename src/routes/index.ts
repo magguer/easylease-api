@@ -1,12 +1,12 @@
-import { Router } from "express";
+import { Express } from "express";
+
 import listingRoutes from "./listing.routes";
 import leadRoutes from "./lead.routes";
 import partnerRoutes from "./partner.routes";
 
-const router = Router();
 
-router.use("/listings", listingRoutes);
-router.use("/leads", leadRoutes);
-router.use("/partners", partnerRoutes);
-
-export default router;
+export default (app: Express) => {
+app.use("/listings", listingRoutes);
+app.use("/leads", leadRoutes);
+app.use("/partners", partnerRoutes);
+};

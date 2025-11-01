@@ -1,49 +1,32 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    // File Layout
-    "rootDir": "src",
-    "outDir": "dist",
+    /* Proyectos */
+    // Configuraciones opcionales
 
-    // Environment Settings
-    // See also https://aka.ms/tsconfig/module
-    "module": "ES2022",
-    "target": "ES2022",
-    "moduleResolution": "node",
-    "types": ["node"],
-    // For nodejs:
-    // "lib": ["esnext"],
-    // "types": ["node"],
-    // and npm install -D @types/node
+    /* Lenguaje y Entorno */
+    "target": "ESNext", // JavaScript moderno (ES2022)
+    "module": "ESNext", // ES Modules
+    "outDir": "./build", // Salida de los archivos compilados
 
-    // Other Outputs
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
+    /* Módulos */
+    "moduleResolution": "node", // Node.js para resolución de módulos
+    "esModuleInterop": true, // Facilita la interoperabilidad entre ES y CommonJS
 
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    /* Strict Mode */
+    "strict": true, // Habilitar todas las verificaciones estrictas
+    "noUnusedLocals": false, // Detectar variables locales no usadas
+    "noUnusedParameters": false, // Detectar parámetros no usados
+    "noImplicitReturns": false, // Detectar rutas sin retornos implícitos
+    "noFallthroughCasesInSwitch": true, // Detectar errores en switch
 
-    // Style Options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
+    /* Alias para rutas */
+    "paths": {
+      "@/*": ["./*"] // Alias para que importes con @
+    },
 
-    // Recommended Options
-    "strict": true,
-    "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-  }
+    /* Otros */
+    "skipLibCheck": true // Omitir verificación de archivos de declaración
+  },
+  "include": ["src/**/*.ts", "src/server.ts", "./api/*.ts", "@types/**/*"], // Incluir todos los archivos TypeScript en src
+  "exclude": ["node_modules", "build"] // Excluir node_modules
 }

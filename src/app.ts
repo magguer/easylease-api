@@ -2,23 +2,30 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import mongoose from "mongoose";
 import routes from "./routes";
-import { connectDB } from "./config/db";
 
 const app = express();
 
-// Connect to database (lazy connection for serverless)
+// MongoDB connection for serverless (lazy connection)
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/easylease";
 let dbConnected = false;
 
 async function ensureDbConnection() {
-  if (!dbConnected) {
-    await connectDB();
-    dbConnected = true;
+  if (!dbConnected && mongoose.connection.readyState !== 1) {
+    try {
+      await mongoose.connect(MONGODB_URI);
+      dbConnected = true;
+      console.log("✅ MongoDB connected (serverless)");
+    } catch (error) {
+      console.error("❌ MongoDB connection error:", error);
+      throw error;
+    }
   }
 }
 
-// Middleware to ensure DB connection
-app.use(async (req, res, next) => {
+// Middleware to ensure DB connection for serverless
+app.use(async (_req, res, next) => {
   try {
     await ensureDbConnection();
     next();
@@ -44,17 +51,16 @@ app.get("/api/health", (_, res) => {
     ok: true,
     status: "healthy",
     timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     env: {
       NODE_ENV: process.env.NODE_ENV,
       hasMongoURI: !!process.env.MONGODB_URI,
-      hasSupabaseURL: !!process.env.SUPABASE_URL,
-      hasSupabaseKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     }
   });
 });
 
-// API routes
-app.use("/api", routes);
+// Mount routes directly (no /api prefix here since routes are already defined)
+routes(app);
 
 // 404 handler
 app.use((req, res) => {

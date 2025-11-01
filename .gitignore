@@ -8,10 +8,6 @@ build/
 .vscode/
 .next/
 coverage/
-node_modules
-dist
-.env
 *.log
-.DS_Store
-# Allow committing `api/index.js` serverless entry for Vercel if needed
-# (some builds generate this file in dist/; keep dist/ ignored)
+
+# api/index.ts is the Vercel entry point and should be committed

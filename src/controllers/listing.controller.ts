@@ -1,19 +1,19 @@
 import express from "express";
 import Listing from "../models/Listing";
 import { z } from "zod";
-import { uploadListingImage, getListingImageUrl, deleteListingImage as deleteFromSupabase, supabase, IMAGES_BUCKET } from "../config/supabase";
+import { supabase, IMAGES_BUCKET } from "../config/supabase";
 import multer from "multer";
 
 type Request = express.Request;
 type Response = express.Response;
 
-// Configure multer for memory storage
+// Configure multer for memory storage (used in routes, not here)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
-  fileFilter: (req: any, file: any, cb: any) => {
+  fileFilter: (_req: any, file: any, cb: any) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -21,6 +21,8 @@ const upload = multer({
     }
   }
 });
+
+export { upload };
 
 const createListingSchema = z.object({
   title: z.string().min(3),
