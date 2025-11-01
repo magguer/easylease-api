@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listPublished, listAll, getListingBySlug, getListingById, createListing, updateListing, deleteListing, uploadListingImages, deleteListingImage, upload, } from "../controllers/listing.controller";
+import { listPublished, listAll, getListingBySlug, getListingById, createListing, updateListing, deleteListing, uploadListingImages, deleteListingImage, upload, } from "../controllers/listing.controller.js";
 const router = Router();
 // Admin routes (specific paths first)
 router.get("/admin/all", listAll);

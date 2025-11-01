@@ -1,6 +1,6 @@
-import listingRoutes from "./listing.routes";
-import leadRoutes from "./lead.routes";
-import partnerRoutes from "./partner.routes";
+import listingRoutes from "./listing.routes.js";
+import leadRoutes from "./lead.routes.js";
+import partnerRoutes from "./partner.routes.js";
 export default (app) => {
     app.use("/listings", listingRoutes);
     app.use("/leads", leadRoutes);

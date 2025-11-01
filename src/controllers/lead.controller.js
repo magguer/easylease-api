@@ -1,4 +1,4 @@
-import Lead from "../models/Lead";
+import Lead from "../models/Lead.js";
 import { z } from "zod";
 const createLeadSchema = z.object({
     name: z.string().min(2),

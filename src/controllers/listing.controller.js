@@ -1,6 +1,6 @@
-import Listing from "../models/Listing";
+import Listing from "../models/Listing.js";
 import { z } from "zod";
-import { supabase, IMAGES_BUCKET } from "../config/supabase";
+import { supabase, IMAGES_BUCKET } from "../config/supabase.js";
 import multer from "multer";
 // Configure multer for memory storage (used in routes, not here)
 const upload = multer({

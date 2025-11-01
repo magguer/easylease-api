@@ -1,4 +1,4 @@
-import Partner from "../models/Partner";
+import Partner from "../models/Partner.js";
 import { z } from "zod";
 const createPartnerSchema = z.object({
     name: z.string().min(2),
