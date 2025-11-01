@@ -35,6 +35,51 @@ export async function createLead(req, res) {
         res.status(500).json({ success: false, error: error.message });
     }
 }
+export async function getLeadById(req, res) {
+    try {
+        const { id } = req.params;
+        const lead = await Lead.findById(id).populate("listing_id", "title slug");
+        if (!lead) {
+            return res.status(404).json({ success: false, error: "Lead not found" });
+        }
+        res.json({ success: true, data: lead });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
+export async function updateLead(req, res) {
+    try {
+        const { id } = req.params;
+        const updated = await Lead.findByIdAndUpdate(id, req.body, {
+            new: true,
+            runValidators: true,
+        });
+        if (!updated) {
+            return res.status(404).json({ success: false, error: "Lead not found" });
+        }
+        res.json({ success: true, data: updated });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
+export async function deleteLead(req, res) {
+    try {
+        const { id } = req.params;
+        const deleted = await Lead.findByIdAndDelete(id);
+        if (!deleted) {
+            return res.status(404).json({ success: false, error: "Lead not found" });
+        }
+        res.json({ success: true, message: "Lead deleted" });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
 export async function updateLeadStatus(req, res) {
     try {
         const { id } = req.params;

@@ -37,6 +37,54 @@ export async function createPartner(req, res) {
         res.status(500).json({ success: false, error: error.message });
     }
 }
+export async function getPartnerById(req, res) {
+    try {
+        const { id } = req.params;
+        const partner = await Partner.findById(id);
+        if (!partner) {
+            return res.status(404).json({ success: false, error: "Partner not found" });
+        }
+        res.json({ success: true, data: partner });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
+export async function updatePartner(req, res) {
+    try {
+        const { id } = req.params;
+        const updated = await Partner.findByIdAndUpdate(id, req.body, {
+            new: true,
+            runValidators: true,
+        });
+        if (!updated) {
+            return res.status(404).json({ success: false, error: "Partner not found" });
+        }
+        res.json({ success: true, data: updated });
+    }
+    catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, error: "Email already exists" });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
+export async function deletePartner(req, res) {
+    try {
+        const { id } = req.params;
+        const deleted = await Partner.findByIdAndDelete(id);
+        if (!deleted) {
+            return res.status(404).json({ success: false, error: "Partner not found" });
+        }
+        res.json({ success: true, message: "Partner deleted" });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+}
+
 export async function updatePartnerStatus(req, res) {
     try {
         const { id } = req.params;
