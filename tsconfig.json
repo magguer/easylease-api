@@ -27,6 +27,6 @@
     /* Otros */
     "skipLibCheck": true // Omitir verificación de archivos de declaración
   },
-  "include": ["src/**/*.ts", "src/server.ts", "./api/*.ts", "@types/**/*"], // Incluir todos los archivos TypeScript en src
-  "exclude": ["node_modules", "build"] // Excluir node_modules
+  "include": ["src/**/*.ts", "src/server.ts", "@types/**/*"], // Incluir todos los archivos TypeScript en src
+  "exclude": ["node_modules", "build", "api"] // Excluir node_modules, build y api
 }
