@@ -83,13 +83,68 @@ export async function getListingBySlug(req, res) {
 export async function getListingById(req, res) {
     try {
         const { id } = req.params;
-        const listing = await Listing.findById(id);
+        const user = req.user;
+        
+        const listing = await Listing.findById(id).populate("owner_partner_id", "name email phone");
+        
         if (!listing) {
             return res
                 .status(404)
-                .json({ success: false, error: "Listing not found" });
+                .json({ success: false, message: "Listing not found" });
         }
-        res.json({ success: true, data: listing });
+        
+        // FILTROS POR ROL
+        // Manager: puede ver cualquier propiedad
+        if (user.role === "manager") {
+            return res.json({ success: true, data: listing });
+        }
+        
+        // Owner: solo puede ver sus propias propiedades
+        if (user.role === "owner") {
+            if (!user.partner_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Owner must have a partner_id",
+                });
+            }
+            
+            if (listing.owner_partner_id._id.toString() !== user.partner_id) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Access denied. This property belongs to another owner.",
+                });
+            }
+            
+            return res.json({ success: true, data: listing });
+        }
+        
+        // Tenant: solo puede ver la propiedad que está rentando
+        if (user.role === "tenant") {
+            if (!user.tenant_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Tenant must have a tenant_id",
+                });
+            }
+            
+            const Tenant = (await import("../models/Tenant.js")).default;
+            const tenantData = await Tenant.findById(user.tenant_id);
+            
+            if (!tenantData || tenantData.listing_id.toString() !== id) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Access denied. You can only view your rental property.",
+                });
+            }
+            
+            return res.json({ success: true, data: listing });
+        }
+        
+        // Rol no reconocido
+        return res.status(403).json({
+            success: false,
+            message: "Access denied",
+        });
     }
     catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -98,12 +153,57 @@ export async function getListingById(req, res) {
 export async function listAll(req, res) {
     try {
         const { limit = 50, status } = req.query;
+        const user = req.user;
         const filter = {};
+        
+        // Filtrar por status si se proporciona
         if (status)
             filter.status = status;
+        
+        // FILTROS POR ROL
+        // Manager: ve todas las propiedades
+        if (user.role === "manager") {
+            // No se agrega filtro adicional
+        }
+        // Owner: solo ve sus propiedades
+        else if (user.role === "owner") {
+            if (!user.partner_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Owner must have a partner_id",
+                });
+            }
+            filter.owner_partner_id = user.partner_id;
+        }
+        // Tenant: solo ve la propiedad de su alquiler
+        else if (user.role === "tenant") {
+            if (!user.tenant_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Tenant must have a tenant_id",
+                });
+            }
+            // Obtener el listing_id del tenant
+            const Tenant = (await import("../models/Tenant.js")).default;
+            const tenantData = await Tenant.findById(user.tenant_id);
+            if (!tenantData) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Tenant data not found",
+                });
+            }
+            filter._id = tenantData.listing_id;
+        } else {
+            return res.status(403).json({
+                success: false,
+                message: "Invalid user role",
+            });
+        }
+        
         const items = await Listing.find(filter)
             .sort({ createdAt: -1 })
-            .limit(Number(limit));
+            .limit(Number(limit))
+            .populate("owner_partner_id", "name email company");
         res.json({ success: true, data: items, count: items.length });
     }
     catch (error) {

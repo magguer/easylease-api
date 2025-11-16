@@ -7,14 +7,18 @@ import {
   deleteLead,
   updateLeadStatus, 
 } from "../controllers/lead.controller.js";
+import { authenticate } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.get("/", getAllLeads);
-router.get("/:id", getLeadById);
+// Public route - anyone can create a lead (from website)
 router.post("/", createLead);
-router.put("/:id", updateLead);
-router.delete("/:id", deleteLead);
-router.patch("/:id/status", updateLeadStatus);
+
+// Protected routes - require authentication
+router.get("/", authenticate, getAllLeads);
+router.get("/:id", authenticate, getLeadById);
+router.put("/:id", authenticate, updateLead);
+router.delete("/:id", authenticate, deleteLead);
+router.patch("/:id/status", authenticate, updateLeadStatus);
 
 export default router;
