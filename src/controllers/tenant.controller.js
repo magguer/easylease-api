@@ -1,6 +1,7 @@
 import Tenant from "../models/Tenant.js";
 import Lead from "../models/Lead.js";
 import Listing from "../models/Listing.js";
+import User from "../models/User.js";
 
 // Get all tenants
 export const getAllTenants = async (req, res) => {
@@ -119,10 +120,21 @@ export const getTenantById = async (req, res) => {
   }
 };
 
+// Helper function to generate temporary password
+const generateTempPassword = () => {
+  const length = 10;
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+};
+
 // Create tenant
 export const createTenant = async (req, res) => {
   try {
-    const tenantData = req.body;
+    const { create_user_account, user_password, ...tenantData } = req.body;
 
     // Validate listing exists
     const listing = await Listing.findById(tenantData.listing_id);
@@ -148,9 +160,48 @@ export const createTenant = async (req, res) => {
       });
     }
 
+    // Create user account if requested
+    let userInfo = null;
+    if (create_user_account) {
+      // Check if user already exists with this email
+      const existingUser = await User.findOne({ email: tenantData.email });
+      
+      if (existingUser) {
+        // Update existing user to link with tenant
+        existingUser.tenant_id = tenant._id;
+        existingUser.role = "tenant";
+        await existingUser.save();
+        
+        userInfo = {
+          email: existingUser.email,
+          message: "User account already existed and was linked to tenant",
+          password_reset_required: true,
+        };
+      } else {
+        // Use provided password or generate one
+        const password = user_password || generateTempPassword();
+        const newUser = new User({
+          email: tenantData.email,
+          password: password,
+          name: tenantData.name,
+          role: "tenant",
+          tenant_id: tenant._id,
+          phone: tenantData.phone,
+        });
+        await newUser.save();
+        
+        userInfo = {
+          email: newUser.email,
+          temporary_password: password,
+          message: "User account created successfully",
+        };
+      }
+    }
+
     res.status(201).json({
       success: true,
       data: tenant,
+      user: userInfo,
       message: "Tenant created successfully",
     });
   } catch (error) {
