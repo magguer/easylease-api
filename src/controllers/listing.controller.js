@@ -219,13 +219,22 @@ export async function createListing(req, res) {
             .replace(/[\u0300-\u036f]/g, '') // Remove accents
             .replace(/\s+/g, "-")
             .replace(/[^a-z0-9\-]/g, "") + `-${Date.now()}`;
-        const created = await Listing.create({
+            
+        const listingData = {
             ...validated,
             slug,
-        });
+        };
+
+        // Assign owner if user is an owner
+        if (req.user && req.user.role === 'owner' && req.user.partner_id) {
+            listingData.owner_partner_id = req.user.partner_id;
+        }
+
+        const created = await Listing.create(listingData);
         res.status(201).json({ success: true, data: created });
     }
     catch (error) {
+        console.error("Error creating listing:", error);
         if (error instanceof z.ZodError) {
             return res
                 .status(400)

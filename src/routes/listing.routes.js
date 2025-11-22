@@ -12,13 +12,13 @@ router.get("/admin/:id", authenticate, getListingById);
 router.post("/upload-images", authenticate, upload.array('images', 10), uploadListingImages);
 router.delete("/delete-image", authenticate, deleteListingImage);
 
+// Public routes (must be before /:id)
+router.get("/public", listPublished);
+router.get("/slug/:slug", getListingBySlug);
+
 // Authenticated routes
 router.get("/", authenticate, listAll); // Changed from listPublished to listAll with role filtering
 router.get("/:id", authenticate, getListingById);
-
-// Public routes
-router.get("/public", listPublished);
-router.get("/slug/:slug", getListingBySlug);
 
 // CRUD routes - require authentication
 router.post("/", authenticate, createListing);
