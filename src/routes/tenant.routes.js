@@ -7,6 +7,7 @@ import {
   deleteTenant,
   convertLeadToTenant,
   getTenantsEndingSoon,
+  unlinkTenantFromListing,
 } from "../controllers/tenant.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 
@@ -29,6 +30,9 @@ router.post("/", createTenant);
 
 // Update tenant
 router.put("/:id", updateTenant);
+
+// Unlink tenant from listing
+router.post("/:id/unlink", unlinkTenantFromListing);
 
 // Delete tenant
 router.delete("/:id", deleteTenant);

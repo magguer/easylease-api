@@ -20,19 +20,13 @@ const upload = multer({
 export { upload };
 const createListingSchema = z.object({
     title: z.string().min(3),
-    price_per_week: z.number().positive(),
     address: z.string().min(5),
     suburb: z.string().optional(),
-    bond: z.number().min(0).optional(),
-    bills_included: z.boolean().optional(),
     room_type: z.enum(["master", "double", "single"]).optional(),
-    available_from: z.string().or(z.date()).optional(),
-    min_term_weeks: z.number().positive().optional(),
     preferred_tenants: z.array(z.string()).optional(),
     house_features: z.array(z.string()).optional(),
     rules: z.array(z.string()).optional(),
     images: z.array(z.string()).optional(),
-    status: z.enum(["draft", "published", "reserved", "rented"]).optional(),
     locale: z.enum(["es", "en"]).optional(),
     location: z
         .object({
@@ -85,7 +79,13 @@ export async function getListingById(req, res) {
         const { id } = req.params;
         const user = req.user;
         
-        const listing = await Listing.findById(id).populate("owner_partner_id", "name email phone");
+        const listing = await Listing.findById(id)
+            .populate("owner_id", "name email phone")
+            .populate({
+                path: "tenant_id",
+                select: "name email phone status current_contract_id",
+                strictPopulate: false
+            });
         
         if (!listing) {
             return res
@@ -93,29 +93,48 @@ export async function getListingById(req, res) {
                 .json({ success: false, message: "Listing not found" });
         }
         
+        // Buscar el contrato activo de este listing
+        const Contract = (await import("../models/Contract.js")).default;
+        const activeContract = await Contract.findOne({
+            listing_id: id,
+            status: { $in: ["active", "ending_soon"] }
+        }).populate("tenant_id", "name email phone");
+        
+        // Buscar todos los contratos de este listing (historial)
+        const allContracts = await Contract.find({
+            listing_id: id
+        })
+        .populate("tenant_id", "name email phone status")
+        .sort({ start_date: -1 }); // Ordenar por fecha de inicio, más reciente primero
+        
+        // Agregar los contratos al objeto listing
+        const listingWithContract = listing.toObject();
+        listingWithContract.active_contract = activeContract;
+        listingWithContract.contracts = allContracts;
+        
         // FILTROS POR ROL
         // Manager: puede ver cualquier propiedad
         if (user.role === "manager") {
-            return res.json({ success: true, data: listing });
+            return res.json({ success: true, data: listingWithContract });
         }
         
         // Owner: solo puede ver sus propias propiedades
         if (user.role === "owner") {
-            if (!user.partner_id) {
+            if (!user.owner_id) {
                 return res.status(400).json({
                     success: false,
-                    message: "Owner must have a partner_id",
+                    message: "Owner must have a owner_id",
                 });
             }
             
-            if (listing.owner_partner_id._id.toString() !== user.partner_id) {
+            if (listing.owner_id._id.toString() !== user.owner_id) {
                 return res.status(403).json({
                     success: false,
                     message: "Access denied. This property belongs to another owner.",
                 });
             }
             
-            return res.json({ success: true, data: listing });
+            return res.json({ success: true, data: listingWithContract });
         }
         
         // Tenant: solo puede ver la propiedad que está rentando
@@ -137,7 +156,7 @@ export async function getListingById(req, res) {
                 });
             }
             
-            return res.json({ success: true, data: listing });
+            return res.json({ success: true, data: listingWithContract });
         }
         
         // Rol no reconocido
@@ -167,13 +186,13 @@ export async function listAll(req, res) {
         }
         // Owner: solo ve sus propiedades
         else if (user.role === "owner") {
-            if (!user.partner_id) {
+            if (!user.owner_id) {
                 return res.status(400).json({
                     success: false,
-                    message: "Owner must have a partner_id",
+                    message: "Owner must have a owner_id",
                 });
             }
-            filter.owner_partner_id = user.partner_id;
+            filter.owner_id = user.owner_id;
         }
         // Tenant: solo ve la propiedad de su alquiler
         else if (user.role === "tenant") {
@@ -203,8 +222,27 @@ export async function listAll(req, res) {
         const items = await Listing.find(filter)
             .sort({ createdAt: -1 })
             .limit(Number(limit))
-            .populate("owner_partner_id", "name email company");
-        res.json({ success: true, data: items, count: items.length });
+            .populate("owner_id", "name email company");
+        
+        // Para cada listing, buscar el contrato activo
+        const Contract = (await import("../models/Contract.js")).default;
+        const listingsWithContracts = await Promise.all(
+            items.map(async (listing) => {
+                const activeContract = await Contract.findOne({
+                    listing_id: listing._id,
+                    status: { $in: ["active", "ending_soon"] }
+                })
+                .populate("tenant_id", "name email phone status")
+                .sort({ start_date: -1 });
+                
+                return {
+                    ...listing.toObject(),
+                    active_contract: activeContract || null
+                };
+            })
+        );
+        
+        res.json({ success: true, data: listingsWithContracts, count: listingsWithContracts.length });
     }
     catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -226,8 +264,8 @@ export async function createListing(req, res) {
         };
 
         // Assign owner if user is an owner
-        if (req.user && req.user.role === 'owner' && req.user.partner_id) {
-            listingData.owner_partner_id = req.user.partner_id;
+        if (req.user && req.user.role === 'owner' && req.user.owner_id) {
+            listingData.owner_id = req.user.owner_id;
         }
 
         const created = await Listing.create(listingData);

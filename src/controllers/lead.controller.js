@@ -10,18 +10,18 @@ const createLeadSchema = z.object({
 export async function getAllLeads(req, res) {
     try {
         const { status } = req.query;
-        const { role, partner_id } = req.user;
+        const { role, owner_id } = req.user;
         
         const filter = {};
         if (status) filter.status = status;
         
         // For owners, only show leads for their properties
-        if (role === 'owner' && partner_id) {
+        if (role === 'owner' && owner_id) {
             // Import Listing model dynamically to avoid circular dependencies
             const Listing = (await import('../models/Listing.js')).default;
             
             // Find all listing IDs owned by this partner
-            const ownerListings = await Listing.find({ owner_partner_id: partner_id }).select('_id');
+            const ownerListings = await Listing.find({ owner_id: owner_id }).select('_id');
             const listingIds = ownerListings.map(l => l._id);
             
             // Filter leads by these listing IDs

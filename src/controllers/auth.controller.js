@@ -43,19 +43,19 @@ export const login = async (req, res) => {
 
     // Generate JWT token with role-specific fields
     const tokenPayload = {
-      id: user._id,
+      id: user._id.toString(),
       email: user.email,
       role: user.role,
     };
 
-    // Add partner_id for owners
-    if (user.role === 'owner' && user.partner_id) {
-      tokenPayload.partner_id = user.partner_id;
+    // Add owner_id for owners
+    if (user.role === 'owner' && user.owner_id) {
+      tokenPayload.owner_id = user.owner_id.toString();
     }
 
     // Add tenant_id for tenants
     if (user.role === 'tenant' && user.tenant_id) {
-      tokenPayload.tenant_id = user.tenant_id;
+      tokenPayload.tenant_id = user.tenant_id.toString();
     }
 
     const token = jwt.sign(
@@ -84,7 +84,7 @@ export const login = async (req, res) => {
 // Get current user (requires authentication)
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).populate("partner_id");
+    const user = await User.findById(req.user.id).populate("owner_id");
 
     if (!user) {
       return res.status(404).json({

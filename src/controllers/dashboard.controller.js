@@ -1,7 +1,8 @@
 import Listing from "../models/Listing.js";
 import Lead from "../models/Lead.js";
-import Partner from "../models/Partner.js";
+import Owner from "../models/Owner.js";
 import Tenant from "../models/Tenant.js";
+import Contract from "../models/Contract.js";
 
 // Get dashboard statistics
 export const getStats = async (req, res) => {
@@ -16,8 +17,8 @@ export const getStats = async (req, res) => {
         activeListings,
         totalLeads,
         newLeads,
-        totalPartners,
-        activePartners,
+        totalOwners,
+        activeOwners,
         totalTenants,
         activeTenants,
         tenantsEndingSoon,
@@ -26,8 +27,8 @@ export const getStats = async (req, res) => {
         Listing.countDocuments({ status: "published" }),
         Lead.countDocuments(),
         Lead.countDocuments({ status: "new" }),
-        Partner.countDocuments(),
-        Partner.countDocuments({ isActive: true }),
+        Owner.countDocuments(),
+        Owner.countDocuments({ status: "active" }),
         Tenant.countDocuments(),
         Tenant.countDocuments({ status: "active" }),
         Tenant.countDocuments({ status: "ending_soon" }),
@@ -41,12 +42,15 @@ export const getStats = async (req, res) => {
       const recentListings = await Listing.find()
         .sort({ createdAt: -1 })
         .limit(5)
-        .populate("owner_partner_id", "name email");
+        .populate("owner_id", "name email");
 
       const recentTenants = await Tenant.find()
         .sort({ createdAt: -1 })
         .limit(5)
-        .populate("listing_id", "title address");
+        .populate({
+          path: "current_contract_id",
+          populate: { path: "listing_id", select: "title address" }
+        });
 
       statsData = {
         stats: {
@@ -58,9 +62,9 @@ export const getStats = async (req, res) => {
             total: totalLeads,
             new: newLeads,
           },
-          partners: {
-            total: totalPartners,
-            active: activePartners,
+          owners: {
+            total: totalOwners,
+            active: activeOwners,
           },
           tenants: {
             total: totalTenants,
@@ -75,62 +79,77 @@ export const getStats = async (req, res) => {
     }
     // OWNER: Solo ve sus propiedades e inquilinos
     else if (user.role === "owner") {
-      if (!user.partner_id) {
+      if (!user.owner_id) {
         return res.status(400).json({
           success: false,
-          message: "Owner must have a partner_id",
+          message: "Owner must have a owner_id",
         });
       }
 
       // Obtener propiedades del owner
       const ownerListings = await Listing.find({
-        owner_partner_id: user.partner_id,
+        owner_id: user.owner_id,
       });
       const listingIds = ownerListings.map((l) => l._id);
 
+      // Use Contracts to find tenants for this owner
       const [
         totalListings,
-        activeListings,
-        totalTenants,
-        activeTenants,
-        tenantsEndingSoon,
+        activeContractsCount,
+        endingSoonContractsCount
       ] = await Promise.all([
-        Listing.countDocuments({ owner_partner_id: user.partner_id }),
-        Listing.countDocuments({
-          owner_partner_id: user.partner_id,
-          status: "published",
-        }),
-        Tenant.countDocuments({ listing_id: { $in: listingIds } }),
-        Tenant.countDocuments({
+        Listing.countDocuments({ owner_id: user.owner_id }),
+        Contract.countDocuments({
           listing_id: { $in: listingIds },
-          status: "active",
+          status: { $in: ["active", "ending_soon"] }
         }),
-        Tenant.countDocuments({
+        Contract.countDocuments({
           listing_id: { $in: listingIds },
-          status: "ending_soon",
+          status: "ending_soon"
         }),
       ]);
 
+      // Count rented listings as those with active contracts
+      const rentedListings = activeContractsCount;
+
+      // Total tenants is roughly equal to total contracts (active + ended) for this owner
+      // Or just active ones? The original code counted all tenants with listing_id.
+      // Let's count all contracts for these listings.
+      const totalContractsCount = await Contract.countDocuments({
+        listing_id: { $in: listingIds }
+      });
+
       const recentListings = await Listing.find({
-        owner_partner_id: user.partner_id,
+        owner_id: user.owner_id,
       })
         .sort({ createdAt: -1 })
         .limit(5);
 
-      const recentTenants = await Tenant.find({
-        listing_id: { $in: listingIds },
+      // Get recent tenants via Contracts
+      const recentContracts = await Contract.find({
+        listing_id: { $in: listingIds }
       })
         .sort({ createdAt: -1 })
         .limit(5)
+        .populate("tenant_id")
         .populate("listing_id", "title address");
 
-      // Calcular ingresos mensuales (suma de weekly_rent * 4)
-      const activeTenantsList = await Tenant.find({
+      const recentTenants = recentContracts.map(c => {
+        const tenant = c.tenant_id ? c.tenant_id.toObject() : {};
+        tenant.current_contract_id = {
+          listing_id: c.listing_id
+        };
+        return tenant;
+      }).filter(t => t._id); // Filter out nulls
+
+      // Calculate monthly income from active contracts
+      const activeContracts = await Contract.find({
         listing_id: { $in: listingIds },
         status: "active",
       });
-      const monthlyIncome = activeTenantsList.reduce(
-        (sum, tenant) => sum + tenant.weekly_rent * 4,
+
+      const monthlyIncome = activeContracts.reduce(
+        (sum, contract) => sum + (contract.weekly_rent || 0) * 4,
         0
       );
 
@@ -138,12 +157,12 @@ export const getStats = async (req, res) => {
         stats: {
           listings: {
             total: totalListings,
-            active: activeListings,
+            active: rentedListings,
           },
           tenants: {
-            total: totalTenants,
-            active: activeTenants,
-            ending_soon: tenantsEndingSoon,
+            total: totalContractsCount, // Approximation
+            active: activeContractsCount,
+            ending_soon: endingSoonContractsCount,
           },
           income: {
             monthly: monthlyIncome,
@@ -162,10 +181,11 @@ export const getStats = async (req, res) => {
         });
       }
 
-      const tenantData = await Tenant.findById(user.tenant_id).populate(
-        "listing_id",
-        "title address images"
-      );
+      const tenantData = await Tenant.findById(user.tenant_id)
+        .populate({
+          path: "current_contract_id",
+          populate: { path: "listing_id", select: "title address images" }
+        });
 
       if (!tenantData) {
         return res.status(404).json({
@@ -174,40 +194,69 @@ export const getStats = async (req, res) => {
         });
       }
 
-      // Calcular próximo pago (asumiendo pagos semanales)
-      const today = new Date();
-      const leaseStart = new Date(tenantData.lease_start);
-      const daysSinceStart = Math.floor(
-        (today - leaseStart) / (1000 * 60 * 60 * 24)
-      );
-      const weeksSinceStart = Math.floor(daysSinceStart / 7);
-      const daysUntilNextPayment = 7 - (daysSinceStart % 7);
-      const nextPaymentDate = new Date(today);
-      nextPaymentDate.setDate(today.getDate() + daysUntilNextPayment);
+      // Get current contract
+      const currentContract = tenantData.current_contract_id;
 
-      statsData = {
-        stats: {
-          tenant: {
-            status: tenantData.status,
-            weekly_rent: tenantData.weekly_rent,
-            bond_paid: tenantData.bond_paid,
-            lease_start: tenantData.lease_start,
-            lease_end: tenantData.lease_end,
-            days_remaining: tenantData.days_remaining,
+      if (!currentContract) {
+        // No active contract
+        statsData = {
+          stats: {
+            tenant: {
+              status: "available",
+            },
+            property: null,
+            nextPayment: null,
           },
-          property: {
-            title: tenantData.listing_id?.title,
-            address: tenantData.listing_id?.address,
-            images: tenantData.listing_id?.images || [],
+          tenantData,
+        };
+      } else {
+        // Has active contract - calculate next payment
+        const today = new Date();
+        const leaseStart = new Date(currentContract.start_date);
+        const daysSinceStart = Math.floor(
+          (today - leaseStart) / (1000 * 60 * 60 * 24)
+        );
+
+        let daysUntilNextPayment = 7;
+        if (currentContract.payment_frequency === "fortnightly") {
+          daysUntilNextPayment = 14 - (daysSinceStart % 14);
+        } else if (currentContract.payment_frequency === "monthly") {
+          // Approximate monthly as 30 days
+          daysUntilNextPayment = 30 - (daysSinceStart % 30);
+        } else {
+          // Weekly (default)
+          daysUntilNextPayment = 7 - (daysSinceStart % 7);
+        }
+
+        const nextPaymentDate = new Date(today);
+        nextPaymentDate.setDate(today.getDate() + daysUntilNextPayment);
+
+        statsData = {
+          stats: {
+            tenant: {
+              status: currentContract.status,
+              weekly_rent: currentContract.weekly_rent,
+              bond_paid: currentContract.bond_paid,
+              bond_amount: currentContract.bond_amount,
+              lease_start: currentContract.start_date,
+              lease_end: currentContract.end_date,
+              days_remaining: currentContract.days_remaining,
+              payment_frequency: currentContract.payment_frequency,
+            },
+            property: {
+              title: currentContract.listing_id?.title,
+              address: currentContract.listing_id?.address,
+              images: currentContract.listing_id?.images || [],
+            },
+            nextPayment: {
+              date: nextPaymentDate,
+              amount: currentContract.weekly_rent,
+              daysUntil: daysUntilNextPayment,
+            },
           },
-          nextPayment: {
-            date: nextPaymentDate,
-            amount: tenantData.weekly_rent,
-            daysUntil: daysUntilNextPayment,
-          },
-        },
-        tenantData,
-      };
+          tenantData,
+        };
+      }
     } else {
       return res.status(403).json({
         success: false,

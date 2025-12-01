@@ -35,10 +35,10 @@ const UserSchema = new Schema(
     lastLogin: {
       type: Date,
     },
-    // For owners - link to their Partner profile
-    partner_id: {
+    // For owners - link to their Owner profile
+    owner_id: {
       type: Schema.Types.ObjectId,
-      ref: "Partner",
+      ref: "Owner",
       index: true,
     },
     // For tenants - link to their Tenant profile

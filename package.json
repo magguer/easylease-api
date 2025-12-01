@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "check:users": "node scripts/check-user-data.js",
+    "fix:owner-id": "node scripts/fix-owner-id.js"
   },
   "keywords": [],
   "author": "",
