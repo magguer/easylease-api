@@ -38,8 +38,19 @@ const createListingSchema = z.object({
 export async function listPublished(req, res) {
     try {
         const { suburb, room_type, min_price, max_price, limit = 50 } = req.query;
-        // Show both "published" and "available" listings to the public
-        const filter = { status: { $in: ["published", "available"] } };
+        // Import Contract model
+        const Contract = (await import('../models/Contract.js')).default;
+        
+        // Get listings with active contracts
+        const activeContracts = await Contract.find({
+            status: { $in: ['active', 'ending_soon'] }
+        }).distinct('listing_id');
+        
+        // Build filter - exclude listings with active contracts
+        const filter = {
+            _id: { $nin: activeContracts }
+        };
+        
         if (suburb)
             filter.suburb = suburb;
         if (room_type)
@@ -52,6 +63,7 @@ export async function listPublished(req, res) {
                 filter.price_per_week.$lte = Number(max_price);
         }
         const items = await Listing.find(filter)
+            .populate('owner_id', 'name email')
             .sort({ createdAt: -1 })
             .limit(Number(limit));
         res.json({ success: true, data: items, count: items.length });
@@ -63,10 +75,8 @@ export async function listPublished(req, res) {
 export async function getListingBySlug(req, res) {
     try {
         const { slug } = req.params;
-        const listing = await Listing.findOne({ 
-            slug, 
-            status: { $in: ["published", "available"] } 
-        });
+        const listing = await Listing.findOne({ slug })
+            .populate('owner_id', 'name email phone');
         if (!listing) {
             return res
                 .status(404)
