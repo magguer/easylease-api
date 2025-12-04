@@ -38,35 +38,82 @@ const createListingSchema = z.object({
 export async function listPublished(req, res) {
     try {
         const { suburb, room_type, min_price, max_price, limit = 50 } = req.query;
-        // Import Contract model
         const Contract = (await import('../models/Contract.js')).default;
         
-        // Get listings with active contracts
-        const activeContracts = await Contract.find({
-            status: { $in: ['active', 'ending_soon'] }
-        }).distinct('listing_id');
-        
-        // Build filter - exclude listings with active contracts
-        const filter = {
-            _id: { $nin: activeContracts }
-        };
-        
+        // Build filter for listings
+        const filter = {};
         if (suburb)
             filter.suburb = suburb;
         if (room_type)
             filter.room_type = room_type;
-        if (min_price || max_price) {
-            filter.price_per_week = {};
-            if (min_price)
-                filter.price_per_week.$gte = Number(min_price);
-            if (max_price)
-                filter.price_per_week.$lte = Number(max_price);
-        }
-        const items = await Listing.find(filter)
+        
+        // Get all listings (we'll filter by contract availability below)
+        const listings = await Listing.find(filter)
             .populate('owner_id', 'name email')
             .sort({ createdAt: -1 })
             .limit(Number(limit));
-        res.json({ success: true, data: items, count: items.length });
+        
+        // For each listing, check contract availability
+        const listingsWithContracts = await Promise.all(
+            listings.map(async (listing) => {
+                const listingObj = listing.toObject();
+                
+                // Get all contracts for this listing
+                const contracts = await Contract.find({ listing_id: listing._id })
+                    .sort({ createdAt: -1 });
+                
+                // Check if there's an ACTIVE or ENDING_SOON contract (room is occupied)
+                const occupiedContract = contracts.find(c => 
+                    c.status === 'active' || c.status === 'ending_soon'
+                );
+                
+                // If room is occupied, don't show it
+                if (occupiedContract) {
+                    return null;
+                }
+                
+                // Find an available contract (available status, no tenant needed)
+                const availableContract = contracts.find(c => 
+                    c.status === 'available'
+                );
+                
+                // If no available contract, don't show the listing
+                if (!availableContract) {
+                    return null;
+                }
+                
+                // Attach contract info to the listing
+                listingObj.available_contract = {
+                    _id: availableContract._id,
+                    weekly_rent: availableContract.weekly_rent,
+                    bond_amount: availableContract.bond_amount,
+                    payment_frequency: availableContract.payment_frequency,
+                    bills_included: availableContract.bills_included,
+                    start_date: availableContract.start_date,
+                    end_date: availableContract.end_date,
+                    notice_period_days: availableContract.notice_period_days,
+                    terms: availableContract.terms
+                };
+                
+                return listingObj;
+            })
+        );
+        
+        // Filter out null values (occupied or unavailable listings)
+        let availableListings = listingsWithContracts.filter(l => l !== null);
+        
+        // Apply price filters on contract weekly_rent
+        if (min_price || max_price) {
+            availableListings = availableListings.filter(listing => {
+                const price = listing.available_contract?.weekly_rent;
+                if (!price) return false;
+                if (min_price && price < Number(min_price)) return false;
+                if (max_price && price > Number(max_price)) return false;
+                return true;
+            });
+        }
+        
+        res.json({ success: true, data: availableListings, count: availableListings.length });
     }
     catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -75,6 +122,8 @@ export async function listPublished(req, res) {
 export async function getListingBySlug(req, res) {
     try {
         const { slug } = req.params;
+        const Contract = (await import('../models/Contract.js')).default;
+        
         const listing = await Listing.findOne({ slug })
             .populate('owner_id', 'name email phone');
         if (!listing) {
@@ -82,7 +131,30 @@ export async function getListingBySlug(req, res) {
                 .status(404)
                 .json({ success: false, error: "Listing not found" });
         }
-        res.json({ success: true, data: listing });
+        
+        // Find available contract for this listing
+        const availableContract = await Contract.findOne({
+            listing_id: listing._id,
+            status: 'available'
+        });
+        
+        const listingObj = listing.toObject();
+        
+        if (availableContract) {
+            listingObj.available_contract = {
+                _id: availableContract._id,
+                weekly_rent: availableContract.weekly_rent,
+                bond_amount: availableContract.bond_amount,
+                payment_frequency: availableContract.payment_frequency,
+                bills_included: availableContract.bills_included,
+                start_date: availableContract.start_date,
+                end_date: availableContract.end_date,
+                notice_period_days: availableContract.notice_period_days,
+                terms: availableContract.terms
+            };
+        }
+        
+        res.json({ success: true, data: listingObj });
     }
     catch (error) {
         res.status(500).json({ success: false, error: error.message });

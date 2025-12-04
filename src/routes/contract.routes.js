@@ -10,6 +10,7 @@ import {
   terminateContract,
   restartContract,
   assignTenantToContract,
+  duplicateContract,
 } from "../controllers/contract.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 
@@ -29,6 +30,7 @@ router.delete("/:id", deleteContract);
 router.post("/:id/assign-tenant", assignTenantToContract);
 router.post("/:id/terminate", terminateContract);
 router.post("/:id/restart", restartContract);
+router.post("/:id/duplicate", duplicateContract);
 
 // Document management
 router.post("/:id/documents", addDocument);

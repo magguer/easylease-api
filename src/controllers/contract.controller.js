@@ -274,10 +274,22 @@ export const updateContract = async (req, res) => {
     // Handle status changes
     if (oldStatus !== newStatus) {
       const listing = await Listing.findById(contract.listing_id);
-      const tenant = await Tenant.findById(contract.tenant_id);
+      const tenant = contract.tenant_id ? await Tenant.findById(contract.tenant_id) : null;
 
-      if (newStatus === "active" && oldStatus === "draft") {
-        // Activate contract
+      // Draft -> Available: Contract is ready to be published (has terms but no tenant)
+      if (newStatus === "available" && oldStatus === "draft") {
+        // No additional actions needed
+      }
+      
+      // Available/Draft -> Active: Tenant is assigned and contract starts
+      else if (newStatus === "active" && (oldStatus === "draft" || oldStatus === "available")) {
+        if (!tenant) {
+          return res.status(400).json({
+            success: false,
+            message: "Cannot activate contract without a tenant assigned",
+          });
+        }
+        
         if (listing) {
           listing.status = "reserved";
           listing.tenant_id = tenant._id;
@@ -288,8 +300,13 @@ export const updateContract = async (req, res) => {
           tenant.status = "active";
           await tenant.save();
         }
-      } else if ((newStatus === "ended" || newStatus === "terminated") && oldStatus === "active") {
-        // End contract
+      }
+      
+      // Active -> Ending Soon: Automatically handled by middleware based on days remaining
+      
+      // Active/Ending Soon -> Ended/Terminated: Contract finishes
+      else if ((newStatus === "ended" || newStatus === "terminated") && 
+               (oldStatus === "active" || oldStatus === "ending_soon")) {
         contract.termination_date = new Date();
         await contract.save();
 
@@ -694,6 +711,104 @@ export const restartContract = async (req, res) => {
     });
   } catch (error) {
     console.error("Restart contract error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+// Duplicate/Replicate contract (create a new draft based on existing contract)
+export const duplicateContract = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    const { start_date, end_date } = req.body;
+
+    // Validate required fields
+    if (!start_date || !end_date) {
+      return res.status(400).json({
+        success: false,
+        message: "start_date and end_date are required",
+      });
+    }
+
+    // Find the original contract
+    const originalContract = await Contract.findById(id);
+    if (!originalContract) {
+      return res.status(404).json({
+        success: false,
+        message: "Contract not found",
+      });
+    }
+
+    // Check permissions
+    if (user.role === "owner" && originalContract.owner_id.toString() !== user.owner_id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to duplicate this contract",
+      });
+    }
+
+    // Check if there's already an active or draft contract for this listing
+    const existingContract = await Contract.findOne({
+      listing_id: originalContract.listing_id,
+      status: { $in: ["active", "ending_soon", "draft", "available"] },
+    });
+
+    if (existingContract) {
+      return res.status(400).json({
+        success: false,
+        message: "This property already has an active, available, or draft contract. Terminate or delete it first.",
+      });
+    }
+
+    // Create new contract based on original
+    const newContract = new Contract({
+      listing_id: originalContract.listing_id,
+      owner_id: originalContract.owner_id,
+      tenant_id: null, // New contract starts without tenant
+      status: "available", // Available for rent (ready to accept tenant)
+      
+      // Financial terms (copy from original)
+      weekly_rent: originalContract.weekly_rent,
+      bond_amount: originalContract.bond_amount,
+      bond_paid: false, // Reset bond payment
+      payment_frequency: originalContract.payment_frequency,
+      bills_included: originalContract.bills_included,
+      
+      // Dates (use provided dates)
+      start_date: new Date(start_date),
+      end_date: new Date(end_date),
+      signed_date: new Date(),
+      
+      // Terms (copy from original)
+      notice_period_days: originalContract.notice_period_days,
+      terms: {
+        pets_allowed: originalContract.terms?.pets_allowed || false,
+        smoking_allowed: originalContract.terms?.smoking_allowed || false,
+        parking_spaces: originalContract.terms?.parking_spaces || 0,
+        special_conditions: originalContract.terms?.special_conditions || "",
+      },
+      
+      // Metadata
+      created_by: user._id,
+    });
+
+    await newContract.save();
+
+    const populatedContract = await Contract.findById(newContract._id)
+      .populate("listing_id", "title address images")
+      .populate("owner_id", "name email phone");
+
+    res.status(201).json({
+      success: true,
+      message: "Contract duplicated successfully. New draft contract created.",
+      data: populatedContract,
+    });
+  } catch (error) {
+    console.error("Duplicate contract error:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
