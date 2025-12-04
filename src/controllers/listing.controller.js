@@ -38,7 +38,8 @@ const createListingSchema = z.object({
 export async function listPublished(req, res) {
     try {
         const { suburb, room_type, min_price, max_price, limit = 50 } = req.query;
-        const filter = { status: "published" };
+        // Show both "published" and "available" listings to the public
+        const filter = { status: { $in: ["published", "available"] } };
         if (suburb)
             filter.suburb = suburb;
         if (room_type)
@@ -62,7 +63,10 @@ export async function listPublished(req, res) {
 export async function getListingBySlug(req, res) {
     try {
         const { slug } = req.params;
-        const listing = await Listing.findOne({ slug, status: "published" });
+        const listing = await Listing.findOne({ 
+            slug, 
+            status: { $in: ["published", "available"] } 
+        });
         if (!listing) {
             return res
                 .status(404)
